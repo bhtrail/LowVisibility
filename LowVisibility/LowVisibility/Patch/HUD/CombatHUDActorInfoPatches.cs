@@ -1,36 +1,41 @@
-﻿using BattleTech;
-using BattleTech.UI;
-using Harmony;
+﻿using BattleTech.UI;
 using LowVisibility.Helper;
 using LowVisibility.Object;
 using System;
-using System.Reflection;
 using UnityEngine;
 using us.frostraptor.modUtils;
 
-namespace LowVisibility.Patch {
-    class CombatHUDActorInfoPatches {
+namespace LowVisibility.Patch
+{
+    class CombatHUDActorInfoPatches
+    {
 
         [HarmonyPatch(typeof(CombatHUDActorInfo), "OnStealthChanged")]
-        public static class CombatHUDActorInfo_OnStealthChanged {
-            public static void Postfix(CombatHUDActorInfo __instance, MessageCenterMessage message, AbstractActor ___displayedActor) {
+        public static class CombatHUDActorInfo_OnStealthChanged
+        {
+            public static void Postfix(CombatHUDActorInfo __instance, MessageCenterMessage message, AbstractActor ___displayedActor)
+            {
                 Mod.Log.Trace?.Write("CHUDAI:OSC entered");
 
                 StealthChangedMessage stealthChangedMessage = message as StealthChangedMessage;
-                if (___displayedActor != null && stealthChangedMessage.affectedObjectGuid == ___displayedActor.GUID && __instance.StealthDisplay != null) {
+                if (___displayedActor != null && stealthChangedMessage.affectedObjectGuid == ___displayedActor.GUID && __instance.StealthDisplay != null)
+                {
                     VfxHelper.CalculateMimeticPips(__instance.StealthDisplay, ___displayedActor);
                 }
             }
         }
 
         [HarmonyPatch(typeof(CombatHUDActorInfo), "RefreshAllInfo")]
-        public static class CombatHUDActorInfo_RefreshAllInfo {
-            public static void Postfix(CombatHUDActorInfo __instance, AbstractActor ___displayedActor) {
+        public static class CombatHUDActorInfo_RefreshAllInfo
+        {
+            public static void Postfix(CombatHUDActorInfo __instance, AbstractActor ___displayedActor)
+            {
                 Mod.Log.Trace?.Write("CHUDAI:RAI entered");
 
                 if (___displayedActor == null || ModState.LastPlayerActorActivated == null) return;
 
-                if (__instance.StealthDisplay != null) {
+                if (__instance.StealthDisplay != null)
+                {
                     VfxHelper.CalculateMimeticPips(__instance.StealthDisplay, ___displayedActor);
                 }
             }
@@ -38,109 +43,131 @@ namespace LowVisibility.Patch {
 
         // Show some elements on the Targeting Computer that are normally hidden from blips
         [HarmonyPatch(typeof(CombatHUDActorInfo), "UpdateItemVisibility")]
-        public static class CombatHUDActorInfo_UpdateItemVisibility {
+        public static class CombatHUDActorInfo_UpdateItemVisibility
+        {
 
             public static void Postfix(CombatHUDActorInfo __instance, AbstractActor ___displayedActor,
-                BattleTech.Building ___displayedBuilding, ICombatant ___displayedCombatant) {
+                BattleTech.Building ___displayedBuilding, ICombatant ___displayedCombatant)
+            {
 
                 if (__instance == null || ___displayedActor == null) return;
 
-                try {
+                try
+                {
                     bool isEnemyOrNeutral = false;
                     VisibilityLevel visibilityLevel = VisibilityLevel.None;
-                    if (___displayedCombatant != null) {
-                        if (___displayedCombatant.IsForcedVisible) {
+                    if (___displayedCombatant != null)
+                    {
+                        if (___displayedCombatant.IsForcedVisible)
+                        {
                             visibilityLevel = VisibilityLevel.LOSFull;
-                        } else if (___displayedBuilding != null) {
+                        }
+                        else if (___displayedBuilding != null)
+                        {
                             visibilityLevel = __instance.Combat.LocalPlayerTeam.VisibilityToTarget(___displayedBuilding);
-                        } else if (___displayedActor != null) {
-                            if (__instance.Combat.HostilityMatrix.IsLocalPlayerFriendly(___displayedActor.team)) {
+                        }
+                        else if (___displayedActor != null)
+                        {
+                            if (__instance.Combat.HostilityMatrix.IsLocalPlayerFriendly(___displayedActor.team))
+                            {
                                 visibilityLevel = VisibilityLevel.LOSFull;
-                            } else {
+                            }
+                            else
+                            {
                                 visibilityLevel = __instance.Combat.LocalPlayerTeam.VisibilityToTarget(___displayedActor);
                                 isEnemyOrNeutral = true;
                             }
                         }
                     }
 
-                    Traverse setGOActiveMethod = Traverse.Create(__instance).Method("SetGOActive", new Type[] { typeof(MonoBehaviour), typeof(bool) });
                     // The actual method should handle allied and friendly units fine, so we can just change it for enemies
-                    if (isEnemyOrNeutral && visibilityLevel >= VisibilityLevel.Blip0Minimum && ___displayedActor != null) 
+                    if (isEnemyOrNeutral && visibilityLevel >= VisibilityLevel.Blip0Minimum && ___displayedActor != null)
                     {
 
                         SensorScanType scanType = SensorLockHelper.CalculateSharedLock(___displayedActor, ModState.LastPlayerActorActivated);
-                        bool hasVisualScan = VisualLockHelper.CanSpotTarget(ModState.LastPlayerActorActivated, ModState.LastPlayerActorActivated.CurrentPosition, 
+                        bool hasVisualScan = VisualLockHelper.CanSpotTarget(ModState.LastPlayerActorActivated, ModState.LastPlayerActorActivated.CurrentPosition,
                             ___displayedActor, ___displayedActor.CurrentPosition, ___displayedActor.CurrentRotation, ___displayedActor.Combat.LOS);
 
                         Mod.Log.Debug?.Write($"Updating item visibility for enemy: {CombatantUtils.Label(___displayedActor)} to scanType: {scanType} and " +
                             $"hasVisualScan: {hasVisualScan} from lastActivated: {CombatantUtils.Label(ModState.LastPlayerActorActivated)}");
 
                         // Values that are always displayed
-                        setGOActiveMethod.GetValue(__instance.NameDisplay, true);
-                        setGOActiveMethod.GetValue(__instance.PhaseDisplay, true);
+                        __instance.SetGOActive(__instance.NameDisplay, true);
+                        __instance.SetGOActive(__instance.PhaseDisplay, true);
 
-                        if (scanType >= SensorScanType.StructAndWeaponID) 
+                        if (scanType >= SensorScanType.StructAndWeaponID)
                         {
                             // Show unit summary
-                            setGOActiveMethod.GetValue(__instance.DetailsDisplay, true);
+                            __instance.SetGOActive(__instance.DetailsDisplay, true);
 
                             // Show active state
-                            setGOActiveMethod.GetValue(__instance.InspiredDisplay, false);
+                            __instance.SetGOActive(__instance.InspiredDisplay, false);
 
                             // Show armor and struct
-                            setGOActiveMethod.GetValue(__instance.ArmorBar, true);
-                            setGOActiveMethod.GetValue(__instance.StructureBar, true);
+                            __instance.SetGOActive(__instance.ArmorBar, true);
+                            __instance.SetGOActive(__instance.StructureBar, true);
 
-                            if (___displayedActor as Mech != null) {
-                                setGOActiveMethod.GetValue(__instance.StabilityDisplay, true);
-                                setGOActiveMethod.GetValue(__instance.HeatDisplay, true);
-                            } else {
-                                setGOActiveMethod.GetValue(__instance.StabilityDisplay, false);
-                                setGOActiveMethod.GetValue(__instance.HeatDisplay, false);
+                            if (___displayedActor as Mech != null)
+                            {
+                                __instance.SetGOActive(__instance.StabilityDisplay, true);
+                                __instance.SetGOActive(__instance.HeatDisplay, true);
                             }
-                        } 
-                        else if (scanType >= SensorScanType.ArmorAndWeaponType || hasVisualScan) 
+                            else
+                            {
+                                __instance.SetGOActive(__instance.StabilityDisplay, false);
+                                __instance.SetGOActive(__instance.HeatDisplay, false);
+                            }
+                        }
+                        else if (scanType >= SensorScanType.ArmorAndWeaponType || hasVisualScan)
                         {
                             // Show unit summary
-                            setGOActiveMethod.GetValue(__instance.DetailsDisplay, false);
+                            __instance.SetGOActive(__instance.DetailsDisplay, false);
 
                             // Show active state
-                            setGOActiveMethod.GetValue(__instance.InspiredDisplay, false);
+                            __instance.SetGOActive(__instance.InspiredDisplay, false);
 
                             // Show armor and struct
-                            setGOActiveMethod.GetValue(__instance.ArmorBar, true);
-                            setGOActiveMethod.GetValue(__instance.StructureBar, true);
+                            __instance.SetGOActive(__instance.ArmorBar, true);
+                            __instance.SetGOActive(__instance.StructureBar, true);
 
-                            setGOActiveMethod.GetValue(__instance.StabilityDisplay, false);
-                            setGOActiveMethod.GetValue(__instance.HeatDisplay, false);
-                        } 
-                        else 
+                            __instance.SetGOActive(__instance.StabilityDisplay, false);
+                            __instance.SetGOActive(__instance.HeatDisplay, false);
+                        }
+                        else
                         {
                             // Hide unit summary
-                            setGOActiveMethod.GetValue(__instance.DetailsDisplay, false);
+                            __instance.SetGOActive(__instance.DetailsDisplay, false);
 
                             // Hide active state
-                            setGOActiveMethod.GetValue(__instance.InspiredDisplay, false);
+                            __instance.SetGOActive(__instance.InspiredDisplay, false);
 
                             // Hide armor and struct
-                            setGOActiveMethod.GetValue(__instance.ArmorBar, false);
-                            setGOActiveMethod.GetValue(__instance.StructureBar, false);
+                            __instance.SetGOActive(__instance.ArmorBar, false);
+                            __instance.SetGOActive(__instance.StructureBar, false);
 
-                            setGOActiveMethod.GetValue(__instance.StabilityDisplay, false);
-                            setGOActiveMethod.GetValue(__instance.HeatDisplay, false);
+                            __instance.SetGOActive(__instance.StabilityDisplay, false);
+                            __instance.SetGOActive(__instance.HeatDisplay, false);
                         }
 
                         // TODO: DEBUG TESTING 
-                        if (__instance.MarkDisplay != null) setGOActiveMethod.GetValue(__instance.MarkDisplay, true);
+                        if (__instance.MarkDisplay != null)
+                        {
+                            __instance.SetGOActive(__instance.MarkDisplay, true);
+                        }
 
-                        CombatHUDStateStack stateStack = (CombatHUDStateStack)Traverse.Create(__instance).Property("StateStack").GetValue();
-                        setGOActiveMethod.GetValue(stateStack, false);
+                        __instance.SetGOActive(__instance.StateStack, false);
                     }
                     else
                     {
-                        if (__instance.MarkDisplay != null && ___displayedActor != null) setGOActiveMethod.GetValue(__instance.MarkDisplay, ___displayedActor.IsMarked);
-                    }    
-                } catch (Exception e) {
+                        if (__instance.MarkDisplay != null && ___displayedActor != null)
+                        {
+                            __instance.SetGOActive(__instance.MarkDisplay, ___displayedActor.IsMarked);
+                        }
+
+                    }
+                }
+                catch (Exception e)
+                {
                     Mod.Log.Info?.Write($"Error updating item visibility! Error was: {e.Message}");
                 }
             }

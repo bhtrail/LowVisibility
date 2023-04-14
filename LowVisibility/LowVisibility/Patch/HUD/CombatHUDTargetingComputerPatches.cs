@@ -1,15 +1,11 @@
-﻿using BattleTech;
-using BattleTech.UI;
-using Harmony;
+﻿using BattleTech.UI;
 using Localize;
 using LowVisibility.Helper;
 using LowVisibility.Integration;
 using LowVisibility.Object;
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
 using TMPro;
 using UnityEngine;
 using us.frostraptor.modUtils;
@@ -17,15 +13,9 @@ using us.frostraptor.modUtils;
 namespace LowVisibility.Patch
 {
     // Allow the CombatHUDTargeting computer to be displayed for blips
-    [HarmonyPatch()]
+    [HarmonyPatch(typeof(CombatHUDTargetingComputer), "OnActorHovered", new Type[] { typeof(MessageCenterMessage) })]
     public static class CombatHUDTargetingComputer_OnActorHovered
     {
-
-        // Private method can't be patched by annotations, so use MethodInfo
-        public static MethodInfo TargetMethod()
-        {
-            return AccessTools.Method(typeof(CombatHUDTargetingComputer), "OnActorHovered", new Type[] { typeof(MessageCenterMessage) });
-        }
 
         public static void Postfix(CombatHUDTargetingComputer __instance, MessageCenterMessage message, CombatHUD ___HUD)
         {
@@ -42,7 +32,7 @@ namespace LowVisibility.Patch
                     if (combatant.team != ___HUD.Combat.LocalPlayerTeam && (abstractActor == null ||
                         ___HUD.Combat.LocalPlayerTeam.VisibilityToTarget(abstractActor) >= VisibilityLevel.Blip0Minimum))
                     {
-                        Traverse.Create(__instance).Property("HoveredCombatant").SetValue(combatant);
+                        __instance.HoveredCombatant = combatant;
                     }
                 }
             }
@@ -82,8 +72,10 @@ namespace LowVisibility.Patch
         }
 
         // TODO: Dangerous PREFIX false here!
-        public static bool Prefix(CombatHUDTargetingComputer __instance, CombatHUD ___HUD)
+        public static void Prefix(ref bool __runOriginal, CombatHUDTargetingComputer __instance, CombatHUD ___HUD)
         {
+            if (!__runOriginal) return;
+
             //Mod.Log.Trace?.Write("CHUDTC:U:pre - entered.");
 
             CombatGameState Combat = ___HUD?.Combat;
@@ -113,12 +105,11 @@ namespace LowVisibility.Patch
                 }
                 if (__instance.ActivelyShownCombatant != null)
                 {
-                    Traverse method = Traverse.Create(__instance).Method("UpdateStructureAndArmor", new Type[] { });
-                    method.GetValue();
+                    __instance.UpdateStructureAndArmor();
                 }
             }
 
-            return false;
+            __runOriginal = false;
         }
     }
 

@@ -1,7 +1,5 @@
-﻿using BattleTech;
-using BattleTech.Rendering.Mood;
+﻿using BattleTech.Rendering.Mood;
 using CustomUnits;
-using Harmony;
 using IRBTModUtils.Extension;
 using LowVisibility.Helper;
 using LowVisibility.Object;
@@ -19,8 +17,10 @@ namespace LowVisibility.Patch
 
         public static bool IsFromSave = false;
 
-        public static void Prefix(TurnDirector __instance)
+        public static void Prefix(ref bool __runOriginal, TurnDirector __instance)
         {
+            if (!__runOriginal) return;
+
             Mod.Log.Trace?.Write("TD:OEB:pre entered.");
 
             // Initialize the probabilities
@@ -83,8 +83,10 @@ namespace LowVisibility.Patch
     [HarmonyPatch(typeof(TurnDirector), "StartFirstRound")]
     static class TurnDirector_StartFirstRound
     {
-        static void Prefix()
+        static void Prefix(ref bool __runOriginal)
         {
+            if (!__runOriginal) return;
+
             Mod.Log.Info?.Write($"=== Turn Director is starting first round!");
             // Check fog state
             if (LanceSpawnerGameLogic_OnEnterActive.isObjectivesReady(ModState.Combat.ActiveContract))
@@ -93,9 +95,7 @@ namespace LowVisibility.Patch
                     Mod.Log.Error?.Write("Mood controller was null when attempting to update after manual deploy!");
 
                 Mod.Log.Info?.Write("Applying MoodController logic now that manual deploy is done.");
-                Traverse applyMoodSettingsT = Traverse.Create(BattleTech.Rendering.Mood.MoodController.Instance)
-                    .Method("ApplyMoodSettings", new object[] { true, false });
-                applyMoodSettingsT.GetValue();
+                MoodController.Instance.ApplyMoodSettings(true, false);
             }
         }
     }
@@ -104,8 +104,10 @@ namespace LowVisibility.Patch
     public static class TurnDirector_BeginNewRound
     {
 
-        public static void Prefix(TurnDirector __instance, int round)
+        public static void Prefix(ref bool __runOriginal, TurnDirector __instance, int round)
         {
+            if (!__runOriginal) return;
+
             Mod.Log.Trace?.Write($"TD:BNR entered");
             Mod.ActorStateLog.Info?.Write($"=== Turn Director is beginning round: {round}");
 
@@ -159,8 +161,10 @@ namespace LowVisibility.Patch
     [HarmonyPatch(typeof(TurnDirector), "OnCombatGameDestroyed")]
     public static class TurnDirector_OnCombatGameDestroyed
     {
-        public static void Prefix(TurnDirector __instance)
+        public static void Prefix(ref bool __runOriginal, TurnDirector __instance)
         {
+            if (!__runOriginal) return;
+
             Mod.Log.Debug?.Write($"TD:OCGD entered");
             // Remove all combat state
             CombatHUD_SubscribeToMessages.OnCombatGameDestroyed(__instance.Combat);
@@ -179,20 +183,12 @@ namespace LowVisibility.Patch
         }
     }
 
-    [HarmonyPatch()]
+    [HarmonyPatch(typeof(EncounterLayerParent), "InitFromSavePassTwo", new Type[] { typeof(CombatGameState) })]
     public static class EncounterLayerParent_InitFromSavePassTwo
     {
-
-        // Private method can't be patched by annotations, so use MethodInfo
-        public static MethodInfo TargetMethod()
-        {
-            return AccessTools.Method(typeof(EncounterLayerParent), "InitFromSavePassTwo", new Type[] { typeof(CombatGameState) });
-        }
-
         public static void Postfix(EncounterLayerParent __instance, CombatGameState combat)
         {
             Mod.Log.Trace?.Write($"TD:IFSPT entered");
-
             TurnDirector_OnEncounterBegin.IsFromSave = true;
         }
     }

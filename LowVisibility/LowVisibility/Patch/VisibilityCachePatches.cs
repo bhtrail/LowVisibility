@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using BattleTech;
-using Harmony;
-using LowVisibility.Object;
+﻿using LowVisibility.Object;
 
 namespace LowVisibility.Patch
 {
@@ -14,8 +7,10 @@ namespace LowVisibility.Patch
     {
         // Lowest priority
         [HarmonyPriority(0)]
-        public static void Prefix()
+        public static void Prefix(ref bool __runOriginal)
         {
+            if (!__runOriginal) return;
+
             EWState.InBatchProcess = true;
             EWState.EWStateCache.Clear();
         }
@@ -33,8 +28,10 @@ namespace LowVisibility.Patch
     {
         // Lowest priority
         [HarmonyPriority(0)]
-        public static void Prefix()
+        public static void Prefix(ref bool __runOriginal)
         {
+            if (!__runOriginal) return;
+
             EWState.InBatchProcess = true;
             EWState.EWStateCache.Clear();
         }
